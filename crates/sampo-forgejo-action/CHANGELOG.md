@@ -1,0 +1,401 @@
+# sampo-github-action
+
+## 0.19.0 — 2026-08-20
+
+### Minor changes
+
+- [9674009](https://github.com/bruits/sampo/commit/9674009d747be408412ea86a548b5ef6fdd98dac) In Python (PyPI), Gleam (Hex), and Erlang (Hex) projects, package scanning now honours `.gitignore` files: gitignored manifests are skipped, and virtual environments self-exclude through the catch-all `.gitignore` written by uv and `python -m venv` (Python 3.13+). Only `.gitignore` files inside the repository are read — never your personal global gitignore (`core.excludesFile`) — so local and CI scans agree. — Thanks @goulvenclech!
+- [2d2b75e](https://github.com/bruits/sampo/commit/2d2b75eb10b3fdf46b4bdae9eb6ab6a745bedb8b) **⚠️ breaking change:** Sampo now fails a release when it cannot regenerate a lockfile, instead of warning and committing a stale one. Tooling is checked before anything is written, so a refused `sampo release` or `sampo pre` leaves the workspace untouched.
+  
+  In JavaScript/TypeScript (npm) projects, fixed Bun lockfile regeneration, which ran an invalid command and left the released package stale in `bun.lock`. Bun 1.2 or later is now required. — Thanks @goulvenclech!
+
+### Patch changes
+
+- [ba90194](https://github.com/bruits/sampo/commit/ba90194edc07ad3b5f40811a9590b49a8bf947ef) In JavaScript/TypeScript (npm) projects, fixed a dry-run publish that published for real on Yarn Classic, and publishing on Yarn Berry, which never reached the registry. Where yarn cannot simulate a publish, the dry run is now skipped with a warning. — Thanks @goulvenclech!
+- [7d2a3fa](https://github.com/bruits/sampo/commit/7d2a3fa96737810e299c58d0d013c57ff3585a6c) Fixed the release pull request subscribing every contributor it credits. They are now linked to their profile instead of `@mentioned`, while generated changelogs keep the real `@mention`. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core (Cargo)@0.17.0
+
+## 0.18.0 — 2026-08-13
+
+### Minor changes
+
+- [785c986](https://github.com/bruits/sampo/commit/785c98662a61a204fc43252cb227a1bd2de5e487) **⚠️ breaking change:** Sampo now refuses to release a package whose version it cannot parse or bump (for example a PEP 440 `1.0.0.post1`), instead of planning a do-nothing release that consumed the changeset and wrote a changelog entry under the unchanged version. A run that used to succeed while silently skipping such a package now fails with the package and version named, leaving manifests untouched and no changeset consumed; fix its version, or exclude it with `packages.ignore`. The same validation now runs before `sampo pre enter`'s label switch: a refused entry (invalid label, unbumpable version) used to exit pre-release mode and move preserved changesets back before failing; it now leaves the workspace untouched. — Thanks @goulvenclech!
+- [91bbcc2](https://github.com/bruits/sampo/commit/91bbcc250a37178571054ef8399fac1b52d67740) **Erlang packages are now supported!** Sampo now automatically detects Erlang applications managed by rebar3 (via their `.app.src`, for publishing to Hex) and handles versioning, changelogs, and publishing—even in mixed BEAM workspaces. Applications whose version is derived dynamically (`{vsn, git}`, `{vsn, "%VSN%"}`, or a `.app.src.script`) are skipped with a warning. — Thanks @goulvenclech!
+- [57bb659](https://github.com/bruits/sampo/commit/57bb65924c678d311307e9d9fd5262f507dd9f57) **Gleam packages are now supported!** Sampo now automatically detects Gleam packages managed by `gleam.toml` (for publishing to Hex) and handles versioning, changelogs, and publishing—even in mixed workspaces. — Thanks @goulvenclech!
+- [c22e2db](https://github.com/bruits/sampo/commit/c22e2db24c1a33d9bd0ccafc48a574e0417d428f) **Java packages are now supported!** Sampo now automatically detects Maven projects (via their `pom.xml`, including multi-module reactors with parent-inherited versions) and handles versioning, changelogs, and publishing to Maven Central through `mvn deploy`. Packages whose version is a snapshot or a build-time property (`${revision}`) are skipped with a warning, and Sampo refuses to write a snapshot version rather than lose track of the package. — Thanks @goulvenclech!
+
+### Patch changes
+
+- Updated dependencies: sampo-core (Cargo)@0.16.0
+
+## 0.17.0 — 2026-06-28
+
+### Minor changes
+
+- [10f39d5](https://github.com/bruits/sampo/commit/10f39d5dfe64c5476a59419f37f11716d3e216d4) In PHP (Packagist) projects, added support for private registries. Packages resolved through a private or alternative Composer registry (a `type: "composer"` repository in `composer.json`, or `packagist.org` disabled) no longer have their already-published check run against public Packagist. As private Composer registries (Private Packagist, Satis) stay VCS-based, `sampo publish` defers to the git-tag push that drives the registry update. — Thanks @goulvenclech!
+- [2f56c94](https://github.com/bruits/sampo/commit/2f56c94aa91e4089a388b9079f8c0c79c527c0f5) In JavaScript/TypeScript (npm) projects, added support for private registries. `sampo publish` now authenticates its check for already-published versions with `NPM_TOKEN` or `NODE_AUTH_TOKEN`, falling back to your `.npmrc` when neither is set. — Thanks @goulvenclech!
+- [55c5960](https://github.com/bruits/sampo/commit/55c5960f17bf985a489cf8a9d0df5b2ae81b5544) In Elixir (Hex) projects, added support for private organisations. For packages that declare an `organization` in their `mix.exs` package configuration, `sampo publish` now checks the organisation's repository for already-published versions and authenticates that check with `HEX_API_KEY`. — Thanks @goulvenclech!
+- [53aacb9](https://github.com/bruits/sampo/commit/53aacb9504f0b3a5d2622db55a4c27c56c6e5123) In Cargo (Rust) projects, added support for alternative and private registries, and fixed crates that publish solely to an alternative registry (`publish = ["my-registry"]`) being wrongly marked as non-publishable. `sampo publish` now checks whether a version already exists on the target registry using your Cargo registry configuration and credentials. — Thanks @goulvenclech!
+- [7239416](https://github.com/bruits/sampo/commit/72394160016868c694dff25dfa6c48e390c16371) In Python (PyPI) projects, added support for private indexes. For packages that declare a uv index with a `publish-url` in `pyproject.toml`, `sampo publish` now routes the upload to that index via `uv publish --index`, which resolves the upload URL, credentials, and already-published checks from your uv configuration. — Thanks @goulvenclech!
+
+### Patch changes
+
+- Updated dependencies: sampo-core (Cargo)@0.15.0
+
+## 0.16.1 — 2026-06-19
+
+### Patch changes
+
+- [1ee9aa2](https://github.com/bruits/sampo/commit/1ee9aa26729c5333599fe55d1945cadda2433cd7) Fixed `sampo publish` creating a spurious git tag and GitHub release for non-publishable, versionless packages (workspace containers and other packages marked as non-publishable without a declared version). Non-publishable but versioned packages are still tagged as before. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core (Cargo)@0.14.1
+
+## 0.16.0 — 2026-06-07
+
+### Minor changes
+
+- [2b1b37a](https://github.com/bruits/sampo/commit/2b1b37aa3415ac983d7dbecf1f7041673cda8f01) Made git tag format configurable via new `tag_format` and `short_tags_format` options under `[git]`. Templates accept `{ecosystem}`, `{package_name}`, and `{version}`.
+  
+  `sampo publish` now also detects cross-ecosystem tag conflicts: it errors when two packages would produce the same git tag for the release in flight, and warns when packages share a name across ecosystems with a template that doesn't include `{ecosystem}` (a future version bump would silently collide). Both diagnostics suggest setting `tag_format = "{ecosystem}-{package_name}-v{version}"` as the fix. — Thanks @goulvenclech!
+- [473ee7f](https://github.com/bruits/sampo/commit/473ee7f3f94dad4bcc7fcf1ca03775861246cf74) **⚠️ breaking change:** Sampo no longer overwrites range constraints for internal dependencies (or skips them silently in some cases). During release planning, if a planned version bump doesn't satisfy a range constraint (e.g. bumping `foo` to `2.0.0` when another package requires `foo = "^1.0"`), you'll get either an error (for packages in `fixed` or `linked` groups) or a warning, instead of silently skipping. Pinned versions (e.g. `foo = "1.2.3"`) are still bumped automatically. — Thanks @goulvenclech!
+
+### Patch changes
+
+- Updated dependencies: sampo-core (Cargo)@0.14.0
+
+## 0.15.4 — 2026-04-15
+
+### Patch changes
+
+- [042f263](https://github.com/bruits/sampo/commit/042f26354212981f462597d8355c63b90aad433c) In JavaScript/TypeScript (npm) projects, added support for Bun's new plaintext `bun.lock` lockfile format. — Thanks @davidroeca for your first contribution 🎉!
+- [914328a](https://github.com/bruits/sampo/commit/914328a066311c92015409b1a18ac23295aef7be) In Cargo projects, fixed unnecessarily adding versions to path-only dev dependencies, which caused publish failures when the dev dependency was also bumped in the same release. — Thanks @Princesseuh!
+- Updated dependencies: sampo-core@0.13.3
+
+## 0.15.3 — 2026-04-10
+
+### Patch changes
+
+- [40c7c6d](https://github.com/bruits/sampo/commit/40c7c6decfcd39a1dc7c37681ca54785d385a048) In Cargo projects, fixed valid dev-dependency cycles incorrectly being rejected as dependency cycles during release. — Thanks @Princesseuh!
+- [c00b72b](https://github.com/bruits/sampo/commit/c00b72bb0b13e24ec264e9df78f9e62e3ac9bd4e) Fixed incorrect stable version computation when stabilizing a prerelease package (e.g. `0.2.7-alpha.6` + patch now correctly produces `0.2.7` instead of `0.2.8`). Fixed the stabilize PR not being created after merging a prerelease PR. — Thanks @rickmartensnl!
+- Updated dependencies: sampo-core@0.13.2
+
+## 0.15.2 — 2026-04-02
+
+### Patch changes
+
+- [f8d8ad5](https://github.com/bruits/sampo/commit/f8d8ad55a7c564774230998f41cdafb2c4a57f87) Fixed a Github settings issue that prevented uploading release assets in the GitHub Action. — Thanks @goulvenclech!
+
+## 0.15.1 — 2026-04-02
+
+### Patch changes
+
+- [9f69d99](https://github.com/bruits/sampo/commit/9f69d99ae79d9cf5769941cc1211a860ca8a1c27) Fixed prerelease versioning to advance the base version before incrementing prerelease counters, and to only preserve prerelease-targeted changesets. — Thanks @rickmartensnl!
+- [3819bb4](https://github.com/bruits/sampo/commit/3819bb44c0d29e5d431815d04d656e95fbc85057) In Cargo (Rust) projects, fixed a bug overwriting `version.workspace = true` in member crates. Sampo now preserves workspace version inheritance, and updates the root manifest's `[workspace.package].version` and `[workspace.dependencies]` correctly. — Thanks @goulvenclech!
+- [e30fd3e](https://github.com/bruits/sampo/commit/e30fd3eb314eab6dce9e919f110ce7aee8c7c874) Fixed version pinning in the GitHub Action: the installed binary now matches the action tag instead of always pulling the latest version from crates.io. Fixed silent failure when uploading release assets to an existing GitHub release. Improved boolean input compatibility for `dry-run` and `create-github-release` options. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.13.1
+
+## 0.15.0 — 2026-03-05
+
+### Minor changes
+
+- [6678ecd](https://github.com/bruits/sampo/commit/6678ecd70695bc4e16417719c3628ad457b758a3) Added ecosystem-specific `--*-args` inputs to the CLI and `*-args` inputs to the GitHub Action (e.g. `--cargo-args` or `npm-args`), allowing users to forward extra arguments to specific package managers. The existing `-- <args>` syntax continues to forward arguments to all ecosystems. — Thanks @goulvenclech!
+
+### Patch changes
+
+- [c8b2389](https://github.com/bruits/sampo/commit/c8b2389e7d55da858d11218cbed942a96806ba92) Fixed an endless loop where the release PR would be continuously reopened for projects using prerelease versions. — Thanks @rickmartensnl!
+- [edabdac](https://github.com/bruits/sampo/commit/edabdac14bc4ee464f51a2d83f3140e21d525365) Fixed publish command failing on Windows when package managers (npm, pnpm, yarn, composer, mix) are installed as .cmd/.bat scripts. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.13.0
+
+## 0.14.1 — 2026-02-06
+
+### Patch changes
+
+- [d979b54](https://github.com/bruits/sampo/commit/d979b54c4bb0cee7c6f6c4a87611f2f9e08cdd63) Disambiguate same-name packages for prereleases — Thanks @rickmartensnl for your first contribution 🎉!
+
+## 0.14.0 — 2026-01-31
+
+### Minor changes
+
+- [b33b71c](https://github.com/bruits/sampo/commit/b33b71ce0b9fe8962774b80320eea517b066f621) In Elixir (Hex) projects, added support for `@version` module attribute definitions in `mix.exs`. — Thanks @rafaeelaudibert!
+- [19e112a](https://github.com/bruits/sampo/commit/19e112ae1d0e33b6f330bd227716280bb8994dd7) **PHP packages are now supported!** Sampo now automatically detects PHP packages managed by `composer.json` (for Packagist), and handles versioning and changelogs. Publishing works via Git tags rather than registry upload. — Thanks @rafaeelaudibert!
+- [4655864](https://github.com/bruits/sampo/commit/465586474fc8f487ab9ff470ca06bc6e1bbd2b44) Added `git.short_tags` configuration option to create short version tags (`vX.Y.Z`) for a single package. In PHP (Packagist) projects, this enables Composer-compatible releases, with the limitation of not supporting monorepos with multiple publishable PHP packages. — Thanks @goulvenclech!
+
+### Patch changes
+
+- [aa52383](https://github.com/bruits/sampo/commit/aa523834cec193268b773e6f2c4847f2d72d2039) In Rust (Cargo) projects, fixed version detection for packages using `version.workspace = true`. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.12.0
+
+## 0.13.0 — 2026-01-12
+
+### Minor changes
+
+- [1dcc188](https://github.com/bruits/sampo/commit/1dcc188f7cf1d9867dd074f2f6da06f179002dc2) **Python packages are now supported!** Sampo now automatically detects Python packages managed by `pyproject.toml` and `uv` (for publishing to PyPI), and handles versioning, changelogs, and publishing—even in mixed workspaces. — Thanks @rafaeelaudibert for your first contribution 🎉!
+
+### Patch changes
+
+- [26aed7e](https://github.com/bruits/sampo/commit/26aed7ec7994e92f8d6f4392e36cd73b37d2ac70) Changelog entries now correctly credit the original changeset author, even if the file was later edited by someone else. — Thanks @goulvenclech!
+- [2a403f1](https://github.com/bruits/sampo/commit/2a403f13a17a2b2b9b7c98876bef57e1d6b48c2a) Dry-run mode now skips already-published packages before validation, and no longer pushes tags or creates GitHub releases. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.11.0
+
+## 0.12.0 — 2025-12-08
+
+### Minor changes
+
+- [8552e90](https://github.com/bruits/sampo/commit/8552e905285d539ad80870cf75b0a20a4a025a26) Introducing `changesets.tags` configuration option, an optional array of custom changelog section names (default: `[]`). When configured, changesets can use the `bump (Tag)` format to categorize entries under custom headings instead of the default bump-based sections. For example, `tags = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]` enables [Keep a Changelog](https://keepachangelog.com/) style formatting where `cargo/my-crate: minor (Added)` appears under `### Added` while still applying a minor version bump. — Thanks @goulvenclech!
+- [fd7a42a](https://github.com/bruits/sampo/commit/fd7a42a6bda4b1083dcd000478d83830480b7284) The `open-discussion` input now accepts a comma-separated list of package names (e.g. `sampo,sampo-github-action,sampo-github-bot`) to open GitHub Discussions only for specific packages, in addition to true (all) or false (none). — Thanks @goulvenclech!
+
+### Patch changes
+
+- Updated dependencies: sampo-core@0.10.0
+
+## 0.11.2 — 2025-11-18
+
+### Patch changes
+
+- [b6fe0c2](https://github.com/bruits/sampo/commit/b6fe0c2365156c3acaa1fec8269b3346db261c67) Private packages now receive git version tags during `sampo publish`, ensuring the GitHub Action's published output correctly triggers subsequent workflow steps, even for projects that don't publish to package registries. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.9.2
+
+## 0.11.1 — 2025-11-18
+
+### Patch changes
+
+- [253334b](https://github.com/bruits/sampo/commit/253334be5285a79ae3cc411f1c5eab3a3d346c14) Elixir packages without a `package()` function in `mix.exs` are now correctly identified as private and excluded from publishing. — Thanks @goulvenclech!
+- [d7979c5](https://github.com/bruits/sampo/commit/d7979c5e720398bf18fc2d1af042ee0b7621699f) When the ecosystem allows it, `sampo publish` now performs a dry-run publish for each package, before proceeding with the actual publish. If any package fails the dry-run, the publish process is aborted, avoiding partial releases. — Thanks @goulvenclech!
+- [7b95c43](https://github.com/bruits/sampo/commit/7b95c4368e43596f7d9b539cf200c3112a2cbbcf) Sampo now supports single-package Rust repositories, in addition to Cargo workspaces. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.9.1
+
+## 0.11.0 — 2025-10-23
+
+### Minor changes
+
+- [3703dfa](https://github.com/bruits/sampo/commit/3703dfa5c93190ca46d60e1a9e4a96e180f0c3d2) **Elixir packages are now supported!** Sampo now automatically detects Hex packages managed by `mix` (Elixir), and handles versioning, changelogs, and publishing—even in mixed workspaces. — Thanks @goulvenclech!
+
+### Patch changes
+
+- [a83904b](https://github.com/bruits/sampo/commit/a83904bf59f25291b78b466335baec28d8044c94) Npm packages marked `private: true` no longer block Sampo publish when their manifest omits `version`. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.9.0
+
+## 0.10.0 — 2025-10-16
+
+### Minor changes
+
+- [8d4e0e0](https://github.com/bruits/sampo/commit/8d4e0e0b4f076d0679525480539f3cfc170f0ede) **npm packages are now supported!** Sampo now automatically detects npm packages, and handles versioning, changelogs, and publishing—even in mixed Rust/JS workspaces. — Thanks @goulvenclech!
+
+### Patch changes
+
+- Updated dependencies: sampo-core@0.8.0
+
+## 0.9.0 — 2025-10-12
+
+### Minor changes
+
+- [a4bcf23](https://github.com/bruits/sampo/commit/a4bcf230586f6643dd5a75f8c4fe38b0c70b2905) To avoid ambiguity between packages in different ecosystems (e.g. a Rust crate and an npm package both named `example`), Sampo now assigns canonical identifiers to all packages using `<ecosystem>/<name>`, such as `cargo/example` for Rust crates or `npm/example` for JavaScript packages.
+  
+  Changesets, the CLI, and the GitHub Action now accept and emit ecosystem-qualified package names. Plain package names (without ecosystem prefix) are still supported when there is no ambiguity. — Thanks @goulvenclech!
+- [f91656d](https://github.com/bruits/sampo/commit/f91656dcb1ab2ef39515a47dbb6a084e12021295) **⚠️ breaking change:** Drop the built-in binary build/upload flags in favor of a simple new `release-assets` input. Workflows should now provide pre-built artifacts (paths or glob patterns, with optional renames and templated placeholders) that the action uploads after publishing.
+  
+  ```diff
+        - name: Install Rust targets for cross-compilation
+          run: rustup target add x86_64-apple-darwin x86_64-pc-windows-msvc
+  
+  +      - name: Build binaries
+  +        run: |
+  +          cargo build --release --target x86_64-unknown-linux-gnu
+  +          cargo build --release --target x86_64-apple-darwin
+  +          cargo build --release --target x86_64-pc-windows-msvc
+  +          mkdir -p dist
+  +          tar -C target/x86_64-unknown-linux-gnu/release -czf dist/my-cli-x86_64-unknown-linux-gnu.tar.gz my-cli
+  +          tar -C target/x86_64-apple-darwin/release -czf dist/my-cli-x86_64-apple-darwin.tar.gz my-cli
+  +          zip -j dist/my-cli-x86_64-pc-windows-msvc.zip target/x86_64-pc-windows-msvc/release/my-cli.exe
+  
+        - name: Run Sampo to release & publish
+          uses: bruits/sampo/crates/sampo-github-action@main
+          with:
+            create-github-release: true
+  -          upload-binary: true
+  -          targets: x86_64-unknown-linux-gnu, x86_64-apple-darwin, x86_64-pc-windows-msvc
+  +          release-assets: |
+  +            dist/my-cli-x86_64-unknown-linux-gnu.tar.gz => my-cli-{{tag}}-x86_64-unknown-linux-gnu.tar.gz
+  +            dist/my-cli-x86_64-apple-darwin.tar.gz => my-cli-{{tag}}-x86_64-apple-darwin.tar.gz
+  +            dist/my-cli-x86_64-pc-windows-msvc.zip => my-cli-{{tag}}-x86_64-pc-windows-msvc.zip
+  ```
+   — Thanks @goulvenclech!
+
+### Patch changes
+
+- [99b5683](https://github.com/bruits/sampo/commit/99b568353ee8e08680119229b9218f6c021e3aa1) Should now use `sampo` and `sampo-github-action` binaries instead of re-compiling from source. Speeds up the release workflow significantly. — Thanks @goulvenclech!
+- [99b5683](https://github.com/bruits/sampo/commit/99b568353ee8e08680119229b9218f6c021e3aa1) Each `sampo` and `sampo-github-action` GitHub release should now include binaries with proper names and formats. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.7.0
+
+## 0.8.2 — 2025-10-04
+
+### Patch changes
+
+- [4440d02](https://github.com/bruits/sampo/commit/4440d02cc1ab274f77ba14e93fab3d34211e0947) Fixed GitHub Discussions creation failing with 404 error by migrating from REST API to GraphQL API. — Thanks @goulvenclech!
+
+## 0.8.1 — 2025-10-03
+
+### Patch changes
+
+- [8ccbf32](https://github.com/bruits/sampo/commit/8ccbf3225a3ee005a958e592f909f547ec464b84) Fix GitHub Release bodies not being correctly filled when changelogs include release timestamps in their headings. — Thanks @goulvenclech!
+
+## 0.8.0 — 2025-10-03
+
+### Minor changes
+
+- [74b94c6](https://github.com/bruits/sampo/commit/74b94c6623a6096bd501d1d8ae2c1b095bcc20fd) Can now mark GitHub releases as « pre-release » for pre-release branches. — Thanks @goulvenclech!
+- [4afd1dd](https://github.com/bruits/sampo/commit/4afd1dddf5c5b0b318fc5d3ba94e2dce5d017802) Add automatic stabilize PR support: when a release plan targets pre-release versions the action now prepares a companion PR that exits pre-release mode, consumes preserved changesets, and readies the stable release branch. — Thanks @goulvenclech!
+- [ee1cdaa](https://github.com/bruits/sampo/commit/ee1cdaad4672de0cbe62231e3c840f921414b312) Add a release timestamp in changelog headers (e.g., `## 1.0.0 - 2024-06-20`), with configuration options to toggle visibility, pick the format, or force a timezone. — Thanks @goulvenclech!
+- [3e0f9ad](https://github.com/bruits/sampo/commit/3e0f9ad64f461aa03f00ebf29f2362583252bf49) While in pre-release mode, you can continue to add changesets and run `sampo release` and `sampo publish` as usual, Sampo preserves the consumed changesets in `.sampo/prerelease/`. When exiting pre-release mode or switching to a different label (for example, from `alpha` to `beta`), any preserved changesets are restored back to `.sampo/changesets/`, so the next release keeps the full history. — Thanks @goulvenclech!
+- [fff8a3d](https://github.com/bruits/sampo/commit/fff8a3d2e23861878b05124449888414aac65e55) Update the release automation to create a dedicated pull request branch per release line (for example `release/main` and `release/3.x`). Each branch now has an independent PR title and force-pushed branch, so concurrent maintenance streams stay isolated while the action refreshes their release plans. — Thanks @goulvenclech!
+- [fff8a3d](https://github.com/bruits/sampo/commit/fff8a3d2e23861878b05124449888414aac65e55) Add a `[git]` configuration section that defines the default release branch (default to `"main"`) and the full set of branch names allowed to run `sampo release` or `sampo publish`. The CLI and GitHub Action now detect the current branch (or respect `SAMPO_RELEASE_BRANCH`) and abort early when the branch is not whitelisted, enabling parallel maintenance lines such as `main` and `3.x` without cross-contamination. — Thanks @goulvenclech!
+- [74b94c6](https://github.com/bruits/sampo/commit/74b94c6623a6096bd501d1d8ae2c1b095bcc20fd) Added support for pre-release identifiers such as `1.8.0-alpha` or `2.0.0-rc.3`. While a pre-release stays within its implied level (patch for `x.y.z-prerelease`, minor for `x.y.0-prerelease`, major for `x.0.0-prerelease`), we only bump the numeric suffix (`alpha` → `alpha.1` -> `alpha.2` -> etc). If a higher bump is required, we advance the base version first and reset the numeric suffix (`1.8.0-alpha.2` + major → `2.0.0-alpha`). Purely numeric tags like `1.0.0-1` are rejected. — Thanks @goulvenclech!
+
+### Patch changes
+
+- [a290985](https://github.com/bruits/sampo/commit/a29098505b3a93392b971995ffc601646e77f706) Fix release workflow so root `Cargo.toml` refreshes semver versions for member dependencies declared in `[workspace.dependencies]`, while leaving wildcard or path-only entries untouched. — Thanks @goulvenclech!
+- [4f28531](https://github.com/bruits/sampo/commit/4f285311cc1cbbbdbeddbd36b2095affabff73e6) Stop including the redundant version header in GitHub release bodies. — Thanks @goulvenclech!
+- [4afd1dd](https://github.com/bruits/sampo/commit/4afd1dddf5c5b0b318fc5d3ba94e2dce5d017802) When updating changelogs, Sampo now preserves any intro content or custom main header before the first `##` section. You can also manually edit previously released entries, and Sampo will keep them intact. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.6.0
+
+## 0.7.1
+
+### Patch changes
+
+- [6c431c4](https://github.com/bruits/sampo/commit/6c431c4a93c9195e7a9f0eee4e82b88d945a1a47) Releases now bump the right crate even if the package name is quoted. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.5.0
+
+
+## 0.7.0
+
+### Minor changes
+
+- [99ef058](https://github.com/bruits/sampo/commit/99ef0587da95359d82be7c1c3d1d454b192e68d1) **⚠️ breaking change:** Drop the legacy `prepare-pr`, `post-merge-publish`, and `release-and-publish` commands in favour of the unified `auto` flow and the explicit `release` / `publish` modes. This simplifies massively the configuration and usage, with only one workflow needed for both creating release PRs and publishing crates. See usage details in [crates/sampo-github-action/README.md](https://github.com/bruits/sampo/blob/main/crates/sampo-github-action/README.md). — Thanks @goulvenclech!
+
+
+## 0.6.0
+
+### Minor changes
+
+- [786aa6e](https://github.com/bruits/sampo/commit/786aa6e7c4e84e49e7f1aa3013d8a2c844967466) Sampo Github Action's Github Releases now include prebuilt binaries for CLI crates on Linux, macOS, and Windows. Enable with `create-github-release: true` and `upload-binary: true` (library-only crates are skipped automatically). — Thanks @goulvenclech!
+
+
+## 0.5.2
+
+### Patch changes
+
+- [0936318](https://github.com/bruits/sampo/commit/0936318b145d1265bf4a2e9128ce333336a0f7ff) Regenerate lockfiles at release, so it does not leave the repo dirty. — Thanks @goulvenclech!
+- [0936318](https://github.com/bruits/sampo/commit/0936318b145d1265bf4a2e9128ce333336a0f7ff) Clearer errors when Discussions are disabled or the token lacks scope. — Thanks @goulvenclech!
+- [0936318](https://github.com/bruits/sampo/commit/0936318b145d1265bf4a2e9128ce333336a0f7ff) Refactor error handling to improve context and consistency. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.4.0
+
+
+## 0.5.1
+
+### Patch changes
+
+- [061a5f3](https://github.com/bruits/sampo/commit/061a5f368f6409a868d94dc60f39f0fc1c138727) `packages.ignore` and `packages.ignore_unpublished` configuration options now work as intended for release and publishing steps. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.3.1
+
+
+## 0.5.0
+
+### Minor changes
+
+- [66a075b](https://github.com/bruits/sampo/commit/66a075b33aed9d7e00498c541b79fbb7fcf4eb09) ⚠️ **breaking change:** Rename dependent package options from `fixed_dependencies` and `linked_dependencies` to `fixed` and `linked`.
+  
+  ```diff
+  // .sampo/config.toml
+  [packages]
+  -  fixed_dependencies = [["pkg-a", "pkg-b"], ["pkg-c", "pkg-d", "pkg-e"]]
+  -  linked_dependencies = [["pkg-f", "pkg-g"]]
+  +  fixed = [["pkg-a", "pkg-b"], ["pkg-c", "pkg-d", "pkg-e"]]
+  +  linked = [["pkg-f", "pkg-g"]]
+  ```
+   — Thanks @goulvenclech!
+- [3736d06](https://github.com/bruits/sampo/commit/3736d06afedfa80f09e635d15e0e32c141889a1d) Add support for ignoring packages during releases and in CLI package lists. You can now exclude unpublishable packages or specific packages by name/path patterns from Sampo operations.
+  
+  ```toml
+  [packages]
+  # Skip packages that aren't publishable to crates.io
+  ignore_unpublished = true
+  # Skip packages matching these patterns
+  ignore = [
+    "internal-*",     # Ignore by name pattern
+    "examples/*",     # Ignore by workspace path
+    "benchmarks/*"
+  ]
+  ```
+   — Thanks @goulvenclech!
+
+### Patch changes
+
+- [b4a7ea6](https://github.com/bruits/sampo/commit/b4a7ea6c0bfb693ccbe77d0ffc6b72d540a164ff) Fixed a formatting issue in release notes when a block of code was followed immediately by the contributor acknowledgment text. — Thanks @goulvenclech!
+- [b4a7ea6](https://github.com/bruits/sampo/commit/b4a7ea6c0bfb693ccbe77d0ffc6b72d540a164ff) Nesting should be preserved in release notes, even for nested lists. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.3.0
+
+
+## 0.4.2
+
+### Patch changes
+
+- Updated dependencies: sampo-core@0.2.1
+
+
+## 0.4.1
+
+### Patch changes
+
+- [4bcb266](https://github.com/bruits/sampo/commit/4bcb266e847d0035a5ba4da17109237e74f82993) Fix "Problems parsing JSON" errors when creating GitHub pull requests, and overall better error handling when interacting with the GitHub API. — Thanks @goulvenclech!
+
+
+## 0.4.0
+
+### Minor changes
+
+- [e511d28](https://github.com/bruits/sampo/commit/e511d28b15ef5aac0e07ef31ddc7112bdae9b64c) GitHub releases now use the matching changelog section as body. Optional Discussions creation is supported, with new `open-discussion` and `discussion-category` inputs. — Thanks @goulvenclech!
+
+### Patch changes
+
+- [81344d5](https://github.com/bruits/sampo/commit/81344d512b41d94b28d0dc62d8737e13b0384a8d) Restore detailed changelog for release PRs. — Thanks @goulvenclech!
+- [81344d5](https://github.com/bruits/sampo/commit/81344d512b41d94b28d0dc62d8737e13b0384a8d) Fix unsolicited Cargo.toml formatting in release PRs. — Thanks @goulvenclech!
+
+
+## 0.3.0
+
+### Minor changes
+
+- [0b3d77b](https://github.com/bruits/sampo/commit/0b3d77bd3c5096e44f459721b5d0b5ba6332705f) Add support for uploading binaries when creating to GitHub releases automatically. — Thanks @Princesseuh!
+
+### Patch changes
+
+- Updated dependencies: sampo-core@0.2.0
+
+
+## 0.2.2
+
+### Patch changes
+
+- [6062083](https://github.com/bruits/sampo/commit/6062083ae20e3bcea6c1f4f00d6b58cf790cd9f1) Fix deploys and publishing. — Thanks @goulvenclech!
+- Updated dependencies: sampo-core@0.1.1
+
+
+## 0.2.1
+
+### Patch changes
+
+- [7397d24](https://github.com/bruits/sampo/commit/7397d24eb0276de3e8aaef6246a4c7b628cfa2a8) Fixed changelog enrichment not working. — Thanks Goulven Clec'h!
+- Updated dependencies: sampo-core@0.1.0
+
+
+## 0.2.0
+
+### Minor changes
+
+- [b68b1e1](https://github.com/bruits/sampo/commit/b68b1e1222355053b815a506365d25cacc6c1f2e) Release PR's changelogs now include clear explanations for automatic version bumps. For example: "Updated dependencies: name@x.x.x" for cascade bumps, and "Bumped due to fixed dependency group policy" for fixed group updates. — Thanks @goulvenclech!
+
+## 0.1.0
+
+### Minor changes
+
+- [`d0d7244`](https://github.com/bruits/sampo/commit/d0d7244a43d76a0d7b377cf5f328a1fe244282b4) Changelog messages are now enriched with commit hash links and author thank-you notes, especially for first-time contributors. Added `[changelog]` configuration section with `show_commit_hash` and `show_acknowledgments` options (both default to true). — Thanks @goulvenclech!
+- [`c7f252e`](https://github.com/bruits/sampo/commit/c7f252ef8c2671c3d35a3a69ab878591f024bf4a) Initial release of Sampo's GitHub Action, to help you automate release workflows in CI/CD pipelines. Supports multiple operation modes: `prepare-pr` (creates/updates Release PRs), `post-merge-publish` (publishes and tags after merge), and traditional `release`/`publish` commands. — Thanks @goulvenclech!

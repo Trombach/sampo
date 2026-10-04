@@ -1,0 +1,195 @@
+name: "Sampo Forgejo Action"
+description: "Run Sampo release and/or publish in CI"
+author: "Trombach"
+
+inputs:
+  command:
+    description: "Operation: auto | release | publish"
+    required: false
+    default: "auto"
+  dry-run:
+    description: "Simulate actions without modifying files or publishing"
+    required: false
+    default: "false"
+  working-directory:
+    description: "Path to repository root (defaults to FORGEJO_WORKSPACE)"
+    required: false
+  cargo-token:
+    description: "crates.io token (exported as CARGO_REGISTRY_TOKEN)"
+    required: false
+  args:
+    description: "Extra flags forwarded to all ecosystem publish commands via `sampo publish -- …`"
+    required: false
+  cargo-args:
+    description: "Extra arguments forwarded only to `cargo publish`"
+    required: false
+  npm-args:
+    description: "Extra arguments forwarded only to npm/pnpm/yarn/bun publish"
+    required: false
+  hex-args:
+    description: "Extra arguments forwarded only to `mix hex.publish`"
+    required: false
+  pypi-args:
+    description: "Extra arguments forwarded only to PyPI/twine upload"
+    required: false
+  packagist-args:
+    description: "Extra arguments forwarded only to Packagist/Composer"
+    required: false
+  maven-args:
+    description: "Extra arguments forwarded only to `mvn deploy`"
+    required: false
+  base-branch:
+    description: "Base branch for the Release PR when auto prepares it"
+    required: false
+  pr-branch:
+    description: "Branch name for the Release PR when auto prepares it"
+    required: false
+  pr-title:
+    description: "Title for the Release PR when auto prepares it"
+    required: false
+  stabilize-pr-branch:
+    description: "Branch name for the Stabilize PR when auto prepares it"
+    required: false
+  stabilize-pr-title:
+    description: "Title for the Stabilize PR when auto prepares it"
+    required: false
+  create-forgejo-release:
+    description: "If true, create Forgejo releases for new tags when publishing"
+    required: false
+    default: "false"
+  release-assets:
+    description: "Comma or newline separated paths/globs for pre-built release assets (optional)"
+    required: false
+  forgejo-token:
+    description: "Forgejo token to create/update PRs (defaults to FORGEJO_TOKEN env)"
+    required: false
+  use-local-build:
+    description: "If true, build and use the local version instead of installing from crates.io"
+    required: false
+    default: "false"
+
+outputs:
+  released:
+    description: "Whether the release step ran successfully"
+    value: ${{ steps.run.outputs.released }}
+  published:
+    description: "Whether the publish step ran successfully"
+    value: ${{ steps.run.outputs.published }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: run
+      name: Run Sampo
+      shell: bash
+      env:
+        INPUT_COMMAND: ${{ inputs.command }}
+        INPUT_DRY_RUN: ${{ inputs['dry-run'] }}
+        INPUT_WORKING_DIRECTORY: ${{ inputs['working-directory'] }}
+        INPUT_CARGO_TOKEN: ${{ inputs['cargo-token'] }}
+        INPUT_ARGS: ${{ inputs.args }}
+        INPUT_CARGO_ARGS: ${{ inputs['cargo-args'] }}
+        INPUT_NPM_ARGS: ${{ inputs['npm-args'] }}
+        INPUT_HEX_ARGS: ${{ inputs['hex-args'] }}
+        INPUT_PYPI_ARGS: ${{ inputs['pypi-args'] }}
+        INPUT_PACKAGIST_ARGS: ${{ inputs['packagist-args'] }}
+        INPUT_MAVEN_ARGS: ${{ inputs['maven-args'] }}
+        INPUT_BASE_BRANCH: ${{ inputs['base-branch'] }}
+        INPUT_PR_BRANCH: ${{ inputs['pr-branch'] }}
+        INPUT_PR_TITLE: ${{ inputs['pr-title'] }}
+        INPUT_STABILIZE_PR_BRANCH: ${{ inputs['stabilize-pr-branch'] }}
+        INPUT_STABILIZE_PR_TITLE: ${{ inputs['stabilize-pr-title'] }}
+        INPUT_CREATE_FORGEJO_RELEASE: ${{ inputs['create-forgejo-release'] }}
+        INPUT_RELEASE_ASSETS: ${{ inputs['release-assets'] }}
+        INPUT_FORGEJO_TOKEN: ${{ inputs['forgejo-token'] }}
+        INPUT_USE_LOCAL_BUILD: ${{ inputs['use-local-build'] }}
+      run: |
+        set -euo pipefail
+
+        # If an explicit token input is provided, use it
+        if [[ -n "${INPUT_FORGEJO_TOKEN:-}" ]]; then
+          export FORGEJO_TOKEN="${INPUT_FORGEJO_TOKEN}"
+        fi
+
+        # Ensure Rust available
+        if ! command -v cargo >/dev/null 2>&1; then
+          echo "Installing Rust toolchain..."
+          if ! command -v curl >/dev/null 2>&1; then
+            if command -v apt-get >/dev/null 2>&1; then
+              echo "Installing curl..."
+              sudo apt-get update -y
+              sudo apt-get install -y curl
+            else
+              echo "curl is required to install Rust and was not found." >&2
+              exit 1
+            fi
+          fi
+          curl https://sh.rustup.rs -sSf | sh -s -- -y
+          source "$HOME/.cargo/env"
+        fi
+
+        # Install cargo-binstall for faster binary installation
+        if ! command -v cargo-binstall >/dev/null 2>&1; then
+          echo "Installing cargo-binstall..."
+          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+        fi
+
+        # Extract the pinned version from this action's own Cargo.toml
+        ACTION_VERSION=$(sed -n 's/^version *= *"\([^"]*\)"/\1/p' "${{ forgejo.action_path }}/Cargo.toml" | head -1)
+        if [[ -z "${ACTION_VERSION}" ]]; then
+          echo "Failed to extract version from ${{ forgejo.action_path }}/Cargo.toml" >&2
+          exit 1
+        fi
+        echo "Pinned sampo-forgejo-action version: ${ACTION_VERSION}"
+
+        # Install or build sampo-forgejo-action binary
+        if [[ "${INPUT_USE_LOCAL_BUILD:-}" == "true" || "${INPUT_USE_LOCAL_BUILD:-}" == "1" ]]; then
+          echo "Building local sampo-forgejo-action..."
+          if [[ -f "${FORGEJO_WORKSPACE}/Cargo.toml" && -d "${FORGEJO_WORKSPACE}/crates/sampo-forgejo-action" ]]; then
+            echo "Found local sampo repository, building from source..."
+            cd "${FORGEJO_WORKSPACE}"
+            cargo build --release --bin sampo-forgejo-action
+            # Add the binary to PATH
+            mkdir -p "$HOME/.local/bin"
+            cp target/release/sampo-forgejo-action "$HOME/.local/bin/"
+            echo "$HOME/.local/bin" >> $FORGEJO_PATH
+          else
+            echo "Local build requested but sampo repository structure not found, falling back to published version..."
+            cargo binstall --no-confirm --version "${ACTION_VERSION}" sampo-forgejo-action
+          fi
+        else
+          echo "Installing sampo-forgejo-action..."
+          cargo binstall --no-confirm --version "${ACTION_VERSION}" sampo-forgejo-action
+        fi
+
+        # Ensure git available (needed for tags and pushing)
+        if ! command -v git >/dev/null 2>&1; then
+          echo "Installing git..."
+          if command -v apt-get >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y git
+          else
+            echo "git is required by this action and was not found." >&2
+            exit 1
+          fi
+        fi
+
+        # Determine workspace root
+        WORKDIR="${INPUT_WORKING_DIRECTORY:-${FORGEJO_WORKSPACE:-.}}"
+        echo "Using workspace: ${WORKDIR}"
+        if [[ ! -d "${WORKDIR}" ]]; then
+          echo "Workspace directory does not exist: ${WORKDIR}" >&2
+          exit 1
+        fi
+
+        # Run sampo-forgejo-action binary directly
+        # (all configuration is read from INPUT_* env vars, no CLI flags needed)
+        cd "${WORKDIR}"
+        sampo-forgejo-action
+
+        # Capture outputs exposed by the binary via FORGEJO_OUTPUT
+        # (Already written by the binary)
+
+branding:
+  icon: "upload-cloud"
+  color: "blue"
